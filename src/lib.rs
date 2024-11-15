@@ -31,20 +31,9 @@ impl Fraction {
     };
 
     pub fn new(numerator: i64, denominator: i64) -> Self {
-        if denominator == 0 {
-            panic!("{}", FractionError::ZeroDenominator);
-        }
-        let sign = Self::match_sign(numerator, denominator);
-        let numerator = numerator.unsigned_abs();
-        let denominator = denominator.unsigned_abs();
-
-        Self {
-            numerator,
-            denominator,
-            sign,
-        }
-        .simplify()
+        Self::try_new(numerator, denominator).expect("Denominator cannot be zero")
     }
+
     pub fn try_new(numerator: i64, denominator: i64) -> Result<Fraction, FractionError> {
         if denominator == 0 {
             return Err(FractionError::ZeroDenominator);
@@ -61,26 +50,20 @@ impl Fraction {
         .simplify())
     }
 
-    const fn match_sign(numerator: i64, denominator: i64) -> Sign {
-        match (numerator.is_negative(), denominator.is_negative()) {
-            (true, true) | (false, false) => Sign::Positive,
-            (true, false) | (false, true) => Sign::Negative,
-        }
-    }
-
     pub const fn simplify(self) -> Self {
         let gcd = gcd(self.numerator, self.denominator);
         let numerator = self.numerator / gcd;
         let denominator = self.denominator / gcd;
+        let sign = self.sign;
+
+        if numerator == 0 {
+            return Self::ZERO;
+        }
 
         Self {
             numerator,
             denominator,
-            sign: if numerator == 0 {
-                Sign::Positive
-            } else {
-                self.sign
-            },
+            sign,
         }
     }
 
@@ -94,37 +77,24 @@ impl Fraction {
             sign: self.sign,
         }
     }
-    pub fn recip_checked(self) -> Result<Self, FractionError> {
-        if self.numerator == 0 {
-            return Err(FractionError::ZeroDenominator);
-        }
-        Ok(Self {
-            numerator: self.denominator,
-            denominator: self.numerator,
-            sign: self.sign,
-        })
-    }
-
-    pub fn checked_div(self, other: Self) -> Result<Self, FractionError> {
-        if other.numerator == 0 {
-            return Err(FractionError::ZeroDenominator);
-        }
-
-        let reciprocal = other.recip();
-        let numerator = self.safe_mul(self.numerator, reciprocal.numerator);
-        let denominator = self.safe_mul(self.denominator, reciprocal.denominator);
-
-        let sign = match (self.sign, reciprocal.sign) {
+    const fn combine_signs(sign1: Sign, sign2: Sign) -> Sign {
+        match (sign1, sign2) {
             (Sign::Positive, Sign::Positive) | (Sign::Negative, Sign::Negative) => Sign::Positive,
             (Sign::Positive, Sign::Negative) | (Sign::Negative, Sign::Positive) => Sign::Negative,
+        }
+    }
+
+    const fn match_sign(numerator: i64, denominator: i64) -> Sign {
+        let sign1 = match numerator.is_negative() {
+            true => Sign::Negative,
+            false => Sign::Positive,
+        };
+        let sign2 = match denominator.is_negative() {
+            true => Sign::Negative,
+            false => Sign::Positive,
         };
 
-        Ok(Fraction {
-            numerator,
-            denominator,
-            sign,
-        }
-        .simplify())
+        Fraction::combine_signs(sign1, sign2)
     }
 }
 
@@ -158,10 +128,7 @@ impl Mul for Fraction {
         let numerator = self.safe_mul(self.numerator, other.numerator);
         let denominator = self.safe_mul(self.denominator, other.denominator);
 
-        let sign = match (self.sign, other.sign) {
-            (Sign::Positive, Sign::Positive) | (Sign::Negative, Sign::Negative) => Sign::Positive,
-            (Sign::Positive, Sign::Negative) | (Sign::Negative, Sign::Positive) => Sign::Negative,
-        };
+        let sign = Self::combine_signs(self.sign, other.sign);
 
         Fraction {
             numerator,
@@ -277,7 +244,7 @@ const fn gcd(mut a: u64, mut b: u64) -> u64 {
     a
 }
 
-fn lcm(a: u64, b: u64) -> u64 {
+const fn lcm(a: u64, b: u64) -> u64 {
     (a / gcd(a, b)) * b
 }
 

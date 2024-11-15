@@ -152,15 +152,6 @@ mod zero {
         let invalid_negative = Fraction::try_new(-1, -0);
         assert!(invalid_negative.is_err());
     }
-
-    #[test]
-    fn div_by_zero() {
-        let half = Fraction::new(1, 2);
-        let zero = Fraction::ZERO;
-
-        assert!(half.checked_div(zero).is_err());
-        assert!(zero.checked_div(zero).is_err());
-    }
 }
 
 #[cfg(test)]
@@ -234,9 +225,6 @@ mod reciprocal_tests {
         let reciprocal_negative_half = negative_half.recip();
 
         assert_eq!(reciprocal_negative_half, Fraction::new(-2, 1));
-
-        let zero = Fraction::ZERO;
-        assert!(zero.recip_checked().is_err());
     }
 }
 
