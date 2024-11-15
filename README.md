@@ -2,7 +2,7 @@ Example usage:
 
 
 ```rust
-use fract::{Fraction, ZERO};
+use fract::Fraction;
 
 fn main() {
     let half = Fraction::new(1, 2);
@@ -16,10 +16,11 @@ fn main() {
     value /= quarter;
     println!("Three is: {value}");
 
-    let zero = ZERO;
+    let zero = Fraction::ZERO;
     println!("Zero is: {zero}");
 
-    let one = zero + Fraction::new(1, 1);
+    let one = zero + Fraction::ONE;
     println!("One is: {one}");
 }
+
 ```
