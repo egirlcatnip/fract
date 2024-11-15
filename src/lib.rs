@@ -28,9 +28,9 @@ impl Fraction {
         .try_simplify()
     }
 
-    pub fn new(numerator: i64, denominator: i64) -> Self {
+    pub const fn new(numerator: i64, denominator: i64) -> Self {
         if denominator == 0 {
-            panic!("{}", FractionError::ZeroDenominator);
+            panic!("Denominator cannot be zero");
         }
         Self {
             numerator,
@@ -58,9 +58,9 @@ impl Fraction {
             denominator,
         })
     }
-    pub fn simplify(self) -> Self {
+    pub const fn simplify(self) -> Self {
         if self.denominator == 0 {
-            panic!("{}", FractionError::ZeroDenominator);
+            panic!("Denominator cannot be zero");
         }
 
         let gcd = gcd(self.numerator, self.denominator);
@@ -77,10 +77,6 @@ impl Fraction {
             numerator,
             denominator,
         }
-    }
-
-    pub fn try_recip(self) -> Result<Self, FractionError> {
-        Self::try_new(self.denominator, self.numerator)
     }
 
     pub fn recip(self) -> Self {
@@ -208,7 +204,7 @@ pub fn checked_gcd(mut a: i64, mut b: i64) -> Result<i64, FractionError> {
     }
     Ok(a)
 }
-pub fn gcd(mut a: i64, mut b: i64) -> i64 {
+pub const fn gcd(mut a: i64, mut b: i64) -> i64 {
     a = a.abs();
     b = b.abs();
 
