@@ -121,22 +121,28 @@ mod assignment_tests {
 #[cfg(test)]
 mod zero_denominator_tests {
     use crate::Fraction;
-    use crate::ZERO;
 
     #[test]
     fn zero_denominator() {
-        let invalid_fraction = Fraction::try_new(1, 0);
+        let invalid_fraction = Fraction::new_checked(1, 0);
         assert!(invalid_fraction.is_err());
 
-        let invalid_negative_fraction = Fraction::try_new(1, -0);
+        let invalid_negative_fraction = Fraction::new_checked(1, -0);
         assert!(invalid_negative_fraction.is_err());
+    }
+}
 
-        let zero = Fraction::new(0, 1);
-        let static_zero = ZERO;
-        assert_eq!(zero, static_zero);
+#[cfg(test)]
+mod zero_tests {
+    use crate::Fraction;
+
+    #[test]
+    fn zero() {
+        let manual_zero = Fraction::new(0, 1);
+        assert_eq!(manual_zero, Fraction::ZERO);
 
         let zero_alternative = Fraction::new(0, 10);
-        assert_eq!(zero_alternative, Fraction::new(0, 1));
+        assert_eq!(zero_alternative, Fraction::ZERO);
     }
 }
 
@@ -196,10 +202,6 @@ mod helper_functions_tests {
         assert_eq!(gcd(0, 10), 10);
         assert_eq!(gcd(5, 0), 5);
         assert_eq!(gcd(101, 103), 1);
-
-        assert_eq!(gcd(-10, 5), 5);
-        assert_eq!(gcd(10, -5), 5);
-        assert_eq!(gcd(-10, -5), 5);
     }
 
     #[test]

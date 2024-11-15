@@ -5,92 +5,104 @@ use std::fmt;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use std::ops::{AddAssign, DivAssign, MulAssign, SubAssign};
 
-#[derive(Debug, Copy, Clone)]
-pub struct Fraction {
-    numerator: i64,
-    denominator: i64,
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum Sign {
+    Positive,
+    Negative,
 }
 
-pub static ZERO: Fraction = Fraction {
-    numerator: 0,
-    denominator: 1,
-};
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Fraction {
+    numerator: u64,
+    denominator: u64,
+    sign: Sign,
+}
 
 impl Fraction {
-    pub fn try_new(numerator: i64, denominator: i64) -> Result<Self, FractionError> {
-        if denominator == 0 {
-            return Err(FractionError::ZeroDenominator);
-        }
-        Self {
-            numerator,
-            denominator,
-        }
-        .try_simplify()
-    }
+    pub const ZERO: Fraction = Fraction {
+        numerator: 0,
+        denominator: 1,
+        sign: Sign::Positive,
+    };
 
-    pub const fn new(numerator: i64, denominator: i64) -> Self {
+    pub fn new(numerator: i64, denominator: i64) -> Self {
         if denominator == 0 {
-            panic!("Denominator cannot be zero");
+            panic!("{}", FractionError::ZeroDenominator);
         }
+        let sign = Self::match_sign(numerator, denominator);
+        let numerator = numerator.unsigned_abs();
+        let denominator = denominator.unsigned_abs();
+
         Self {
             numerator,
             denominator,
+            sign,
         }
         .simplify()
     }
-
-    pub fn try_simplify(self) -> Result<Self, FractionError> {
-        if self.denominator == 0 {
+    pub fn new_checked(numerator: i64, denominator: i64) -> Result<Fraction, FractionError> {
+        if denominator == 0 {
             return Err(FractionError::ZeroDenominator);
         }
-
-        let gcd = checked_gcd(self.numerator, self.denominator)?;
-        let mut numerator = self.numerator / gcd;
-        let mut denominator = self.denominator / gcd;
-
-        if denominator < 0 {
-            numerator = -numerator;
-            denominator = -denominator;
-        }
+        let sign = Self::match_sign(numerator, denominator);
+        let numerator = numerator.unsigned_abs();
+        let denominator = denominator.unsigned_abs();
 
         Ok(Self {
             numerator,
             denominator,
-        })
+            sign,
+        }
+        .simplify())
     }
+
+    const fn match_sign(numerator: i64, denominator: i64) -> Sign {
+        match (numerator.is_negative(), denominator.is_negative()) {
+            (true, true) | (false, false) => Sign::Positive,
+            (true, false) | (false, true) => Sign::Negative,
+        }
+    }
+
     pub const fn simplify(self) -> Self {
-        if self.denominator == 0 {
-            panic!("Denominator cannot be zero");
-        }
-
         let gcd = gcd(self.numerator, self.denominator);
-        let mut numerator = self.numerator / gcd;
-        let mut denominator = self.denominator / gcd;
-
-        // Reverse the sign if the denominator is negative
-        if denominator < 0 {
-            numerator = -numerator;
-            denominator = -denominator;
-        }
+        let numerator = self.numerator / gcd;
+        let denominator = self.denominator / gcd;
 
         Self {
             numerator,
             denominator,
+            sign: if numerator == 0 {
+                Sign::Positive
+            } else {
+                self.sign
+            },
         }
     }
 
     pub fn recip(self) -> Self {
-        Self::new(self.denominator, self.numerator)
+        if self.numerator == 0 {
+            panic!("{}", FractionError::ZeroDenominator);
+        }
+        Self {
+            numerator: self.denominator,
+            denominator: self.numerator,
+            sign: self.sign,
+        }
     }
 }
 
 impl Add for Fraction {
     type Output = Self;
+
     fn add(self, other: Self) -> Self {
         let lcm = lcm(self.denominator, other.denominator);
-        let numerator =
-            self.numerator * (lcm / self.denominator) + other.numerator * (lcm / other.denominator);
-        Fraction::new(numerator, lcm)
+        let numerator_self =
+            self.sign_factor() * (self.numerator as i64) * (lcm / self.denominator) as i64;
+        let numerator_other =
+            other.sign_factor() * (other.numerator as i64) * (lcm / other.denominator) as i64;
+        let numerator = numerator_self + numerator_other;
+
+        Fraction::new(numerator, lcm as i64)
     }
 }
 
@@ -98,32 +110,54 @@ impl Sub for Fraction {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        match self == other {
-            true => Fraction::new(0, 1),
-            false => self + -other,
-        }
+        self + -other
     }
 }
+
 impl Mul for Fraction {
     type Output = Self;
 
     fn mul(self, other: Self) -> Self {
-        let numerator = self.numerator * other.numerator;
-        let denominator = self.denominator * other.denominator;
-        Self::new(numerator, denominator)
+        let numerator = self.safe_mul(self.numerator, other.numerator);
+        let denominator = self.safe_mul(self.denominator, other.denominator);
+
+        let sign = match (self.sign, other.sign) {
+            (Sign::Positive, Sign::Positive) | (Sign::Negative, Sign::Negative) => Sign::Positive,
+            (Sign::Positive, Sign::Negative) | (Sign::Negative, Sign::Positive) => Sign::Negative,
+        };
+
+        Fraction {
+            numerator,
+            denominator,
+            sign,
+        }
+        .simplify()
     }
 }
 
 impl Div for Fraction {
     type Output = Self;
 
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn div(self, other: Self) -> Self {
-        if other.denominator == 0 {
+        if other.numerator == 0 {
             panic!("{}", FractionError::ZeroDenominator);
         }
 
-        self * other.recip()
+        let reciprocal = other.recip();
+        let numerator = self.safe_mul(self.numerator, reciprocal.numerator);
+        let denominator = self.safe_mul(self.denominator, reciprocal.denominator);
+
+        let sign = match (self.sign, reciprocal.sign) {
+            (Sign::Positive, Sign::Positive) | (Sign::Negative, Sign::Negative) => Sign::Positive,
+            (Sign::Positive, Sign::Negative) | (Sign::Negative, Sign::Positive) => Sign::Negative,
+        };
+
+        Fraction {
+            numerator,
+            denominator,
+            sign,
+        }
+        .simplify()
     }
 }
 
@@ -131,7 +165,17 @@ impl Neg for Fraction {
     type Output = Self;
 
     fn neg(self) -> Self {
-        Self::try_new(-self.numerator, self.denominator).unwrap()
+        if self.numerator == 0 {
+            return Self::ZERO;
+        }
+        Self {
+            numerator: self.numerator,
+            denominator: self.denominator,
+            sign: match self.sign {
+                Sign::Positive => Sign::Negative,
+                Sign::Negative => Sign::Positive,
+            },
+        }
     }
 }
 
@@ -159,55 +203,35 @@ impl DivAssign for Fraction {
     }
 }
 
-// Implement the Display trait for Fraction
 impl fmt::Display for Fraction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.denominator == 1 {
-            write!(f, "{}", self.numerator)
-        } else {
-            write!(f, "{}/{}", self.numerator, self.denominator)
-        }
-    }
-}
+        let simplified = self.simplify();
+        let sign = match simplified.sign {
+            Sign::Positive => "",
+            Sign::Negative => "-",
+        };
 
-// Implement Eq and Ord to compare fractions' values
-impl PartialEq for Fraction {
-    fn eq(&self, other: &Self) -> bool {
-        self.numerator == other.numerator && self.denominator == other.denominator
+        if simplified.denominator == 1 {
+            write!(f, "{}{}", sign, simplified.numerator)
+        } else {
+            write!(
+                f,
+                "{}{}/{}",
+                sign, simplified.numerator, simplified.denominator
+            )
+        }
     }
 }
 
 impl PartialOrd for Fraction {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some((self.numerator * other.denominator).cmp(&(other.numerator * self.denominator)))
+        let lhs = (self.sign_factor() * self.numerator as i64) * other.denominator as i64;
+        let rhs = (other.sign_factor() * other.numerator as i64) * self.denominator as i64;
+        lhs.partial_cmp(&rhs)
     }
 }
 
-// Utility functions
-pub fn checked_gcd(mut a: i64, mut b: i64) -> Result<i64, FractionError> {
-    a = a.checked_abs().ok_or(FractionError::GcdError)?;
-    b = b.checked_abs().ok_or(FractionError::GcdError)?;
-
-    let max_iterations = 1000;
-    let mut iterations = 0;
-
-    while b != 0 {
-        if iterations >= max_iterations {
-            return Err(FractionError::GcdError);
-        }
-
-        let temp = b;
-        b = a % b;
-        a = temp;
-
-        iterations += 1;
-    }
-    Ok(a)
-}
-pub const fn gcd(mut a: i64, mut b: i64) -> i64 {
-    a = a.abs();
-    b = b.abs();
-
+const fn gcd(mut a: u64, mut b: u64) -> u64 {
     while b != 0 {
         let temp = b;
         b = a % b;
@@ -216,32 +240,35 @@ pub const fn gcd(mut a: i64, mut b: i64) -> i64 {
     a
 }
 
-pub fn checked_lcm(a: i64, b: i64) -> Result<i64, FractionError> {
-    let gcd = checked_gcd(a, b)?;
-    Ok((a * b).abs() / gcd)
+fn lcm(a: u64, b: u64) -> u64 {
+    (a / gcd(a, b)) * b
 }
 
-pub fn lcm(a: i64, b: i64) -> i64 {
-    let gcd = gcd(a, b);
-    (a * b).abs() / gcd
+impl Fraction {
+    fn sign_factor(&self) -> i64 {
+        match self.sign {
+            Sign::Positive => 1,
+            Sign::Negative => -1,
+        }
+    }
+
+    fn safe_mul(&self, a: u64, b: u64) -> u64 {
+        a.checked_mul(b)
+            .expect("Multiplication overflow in Fraction")
+    }
 }
 
-// Define the FractionError type
 #[derive(Debug)]
 pub enum FractionError {
     ZeroDenominator,
-    GcdError,
 }
 
-// Implement Display for FractionError
-impl std::fmt::Display for FractionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for FractionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             FractionError::ZeroDenominator => write!(f, "Denominator cannot be zero"),
-            FractionError::GcdError => write!(f, "Error computing GCD"),
         }
     }
 }
 
-// Implement Error for FractionError
 impl std::error::Error for FractionError {}
