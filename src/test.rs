@@ -1,29 +1,26 @@
 #[cfg(test)]
-mod equality_tests {
+mod equality {
     use crate::Fraction;
 
     #[test]
     fn equality() {
         let half = Fraction::new(1, 2);
-        let half_alternate = Fraction::new(2, 4);
+        let half_unsimplified = Fraction::new(2, 4);
 
-        assert_eq!(half, half_alternate);
-
-        let third = Fraction::new(1, 3);
-        assert_ne!(half, third);
+        assert_eq!(half, half_unsimplified);
     }
 }
 #[cfg(test)]
-mod ordering_tests {
+mod ordering {
     use crate::Fraction;
 
     #[test]
     fn ordering() {
         let half = Fraction::new(1, 2);
-        let half_alternate = Fraction::new(2, 4);
+        let half_unsimplified = Fraction::new(2, 4);
         let third = Fraction::new(1, 3);
 
-        assert!(half == half_alternate);
+        assert!(half == half_unsimplified);
         assert!(half != third);
 
         assert!(half > third);
@@ -31,7 +28,7 @@ mod ordering_tests {
     }
 }
 #[cfg(test)]
-mod arithmetic_tests {
+mod arithmetic_operations {
     use crate::Fraction;
 
     #[test]
@@ -40,7 +37,7 @@ mod arithmetic_tests {
         let fourth = Fraction::new(1, 4);
 
         assert_eq!((half + half), Fraction::new(1, 1));
-        assert_eq!((half + -half), Fraction::new(0, 1));
+        assert_eq!((half + -half), Fraction::ZERO);
         assert_eq!((half + fourth), Fraction::new(3, 4));
     }
 
@@ -49,7 +46,9 @@ mod arithmetic_tests {
         let half = Fraction::new(1, 2);
         let fourth = Fraction::new(1, 4);
 
-        assert_eq!((half - half), Fraction::new(0, 1));
+        assert_eq!((half - half), Fraction::ZERO);
+        assert_eq!((half - -half), Fraction::new(1, 1));
+        assert_eq!((-half - half), Fraction::new(-1, 1));
         assert_eq!((half - fourth), Fraction::new(1, 4));
         assert_eq!((fourth - half), Fraction::new(-1, 4));
     }
@@ -58,96 +57,114 @@ mod arithmetic_tests {
     fn mul() {
         let half = Fraction::new(1, 2);
         let third = Fraction::new(1, 3);
-        let one = Fraction::new(1, 1);
 
         assert_eq!((half * third), Fraction::new(1, 6));
         assert_eq!((half * half), Fraction::new(1, 4));
         assert_eq!((half * -half), Fraction::new(-1, 4));
-        assert_eq!((half * one), Fraction::new(1, 2));
     }
 
     #[test]
     fn div() {
-        let half = Fraction::new(1, 2);
         let third = Fraction::new(1, 3);
-        let one = Fraction::new(1, 1);
+        let half = Fraction::new(1, 2);
 
+        assert_eq!((third / half), Fraction::new(2, 3));
         assert_eq!((half / third), Fraction::new(3, 2));
-        assert_eq!((half / half), Fraction::new(1, 1));
-        assert_eq!((half / -half), Fraction::new(-1, 1));
-        assert_eq!((half / one), Fraction::new(1, 2));
+
+        assert_eq!((third / third), Fraction::ONE);
+        assert_eq!((third / -third), -Fraction::ONE);
+    }
+
+    #[test]
+    fn neg() {
+        let half = Fraction::new(1, 2);
+        assert_eq!(-half, Fraction::new(-1, 2));
+
+        let zero = Fraction::ZERO;
+        assert_eq!(-zero, zero);
     }
 }
 #[cfg(test)]
-mod assignment_tests {
+mod assignment {
     use crate::Fraction;
 
     #[test]
-    fn add_assign() {
+    fn add() {
         let mut frac = Fraction::new(1, 2);
         frac += Fraction::new(1, 3);
+        frac += Fraction::ZERO;
+
         assert_eq!(frac, Fraction::new(5, 6));
     }
 
     #[test]
-    fn sub_assign() {
+    fn sub() {
         let mut frac = Fraction::new(1, 2);
         frac -= Fraction::new(1, 3);
+        frac -= Fraction::ZERO;
+
         assert_eq!(frac, Fraction::new(1, 6));
     }
 
     #[test]
-    fn mul_assign() {
+    fn mul() {
         let mut frac = Fraction::new(1, 2);
         frac *= Fraction::new(3, 4);
+        frac *= Fraction::ONE;
         assert_eq!(frac, Fraction::new(3, 8));
     }
 
     #[test]
-    fn div_assign() {
+    fn div() {
         let mut frac = Fraction::new(3, 4);
         frac /= Fraction::new(6, 4);
+        frac /= Fraction::ONE;
+
         assert_eq!(frac, Fraction::new(1, 2));
     }
-
-    #[test]
-    fn neg_assign() {
-        let mut frac = Fraction::new(3, 4);
-        frac = -frac;
-        assert_eq!(frac, Fraction::new(-3, 4));
-    }
 }
 
 #[cfg(test)]
-mod zero_denominator_tests {
+mod zero {
     use crate::Fraction;
 
     #[test]
-    fn zero_denominator() {
-        let invalid_fraction = Fraction::new_checked(1, 0);
-        assert!(invalid_fraction.is_err());
-
-        let invalid_negative_fraction = Fraction::new_checked(1, -0);
-        assert!(invalid_negative_fraction.is_err());
-    }
-}
-
-#[cfg(test)]
-mod zero_tests {
-    use crate::Fraction;
-
-    #[test]
-    fn zero() {
+    fn is_zero() {
         let manual_zero = Fraction::new(0, 1);
         assert_eq!(manual_zero, Fraction::ZERO);
 
         let zero_alternative = Fraction::new(0, 10);
         assert_eq!(zero_alternative, Fraction::ZERO);
     }
+
+    #[test]
+    fn zero_denominator() {
+        let invalid = Fraction::try_new(1, 0);
+        assert!(invalid.is_err());
+
+        let invalid_negative = Fraction::try_new(1, -0);
+
+        assert!(invalid_negative.is_err());
+
+        let invalid_negative = Fraction::try_new(-1, 0);
+        assert!(invalid_negative.is_err());
+
+        let invalid_negative = Fraction::try_new(-1, -0);
+        assert!(invalid_negative.is_err());
+    }
+
+    #[test]
+    fn div_by_zero() {
+        let half = Fraction::new(1, 2);
+        let zero = Fraction::ZERO;
+
+        assert!(half.checked_div(zero).is_err());
+        assert!(zero.checked_div(zero).is_err());
+    }
 }
 
 #[cfg(test)]
-mod simplification_tests {
+mod simplification {
     use crate::Fraction;
 
     #[test]
@@ -170,25 +187,56 @@ mod simplification_tests {
 }
 
 #[cfg(test)]
-mod negative_fractions_tests {
+mod negative_fractions {
     use crate::*;
 
     #[test]
     fn negative_fractions() {
-        let half = Fraction::new(1, 2);
         let half_negative = Fraction::new(-1, 2);
         assert_eq!(half_negative, Fraction::new(-1, 2));
 
-        let half_double_negative = Fraction::new(-1, -2);
-        assert_eq!(half_negative, Fraction::new(-1, 2));
-        assert_eq!(half, half_double_negative);
-
-        let minus_one = Fraction::new(-1, 1);
-        let half_negative_alt = half * minus_one;
-        assert_eq!(half_negative, half_negative_alt);
-
         let half_negative_switched = Fraction::new(1, -2);
         assert_eq!(half_negative_switched, Fraction::new(-1, 2));
+
+        let half_double_negative = Fraction::new(-1, -2);
+        assert_eq!(half_double_negative, Fraction::new(1, 2));
+    }
+}
+
+#[cfg(test)]
+mod zero_numerator_tests {
+    use crate::Fraction;
+
+    #[test]
+    fn zero_numerator() {
+        let zero = Fraction::ZERO;
+        let half = Fraction::new(1, 2);
+
+        assert_eq!((zero + half), half);
+        assert_eq!((zero - half), -half);
+        assert_eq!((zero * half), zero);
+        assert_eq!((zero / half), zero);
+    }
+}
+
+#[cfg(test)]
+mod reciprocal_tests {
+    use crate::Fraction;
+
+    #[test]
+    fn reciprocal() {
+        let half = Fraction::new(1, 2);
+        let reciprocal_half = half.recip();
+
+        assert_eq!(reciprocal_half, Fraction::new(2, 1));
+
+        let negative_half = Fraction::new(-1, 2);
+        let reciprocal_negative_half = negative_half.recip();
+
+        assert_eq!(reciprocal_negative_half, Fraction::new(-2, 1));
+
+        let zero = Fraction::ZERO;
+        assert!(zero.recip_checked().is_err());
     }
 }
 
@@ -229,5 +277,8 @@ mod display_tests {
 
         let whole_number = Fraction::new(4, 2);
         assert_eq!(format!("{}", whole_number), "2");
+
+        let zero = Fraction::ZERO;
+        assert_eq!(format!("{}", zero), "0");
     }
 }

@@ -24,6 +24,11 @@ impl Fraction {
         denominator: 1,
         sign: Sign::Positive,
     };
+    pub const ONE: Fraction = Fraction {
+        numerator: 1,
+        denominator: 1,
+        sign: Sign::Positive,
+    };
 
     pub fn new(numerator: i64, denominator: i64) -> Self {
         if denominator == 0 {
@@ -40,7 +45,7 @@ impl Fraction {
         }
         .simplify()
     }
-    pub fn new_checked(numerator: i64, denominator: i64) -> Result<Fraction, FractionError> {
+    pub fn try_new(numerator: i64, denominator: i64) -> Result<Fraction, FractionError> {
         if denominator == 0 {
             return Err(FractionError::ZeroDenominator);
         }
@@ -79,7 +84,7 @@ impl Fraction {
         }
     }
 
-    pub fn recip(self) -> Self {
+    fn recip(self) -> Self {
         if self.numerator == 0 {
             panic!("{}", FractionError::ZeroDenominator);
         }
@@ -88,6 +93,38 @@ impl Fraction {
             denominator: self.numerator,
             sign: self.sign,
         }
+    }
+    pub fn recip_checked(self) -> Result<Self, FractionError> {
+        if self.numerator == 0 {
+            return Err(FractionError::ZeroDenominator);
+        }
+        Ok(Self {
+            numerator: self.denominator,
+            denominator: self.numerator,
+            sign: self.sign,
+        })
+    }
+
+    pub fn checked_div(self, other: Self) -> Result<Self, FractionError> {
+        if other.numerator == 0 {
+            return Err(FractionError::ZeroDenominator);
+        }
+
+        let reciprocal = other.recip();
+        let numerator = self.safe_mul(self.numerator, reciprocal.numerator);
+        let denominator = self.safe_mul(self.denominator, reciprocal.denominator);
+
+        let sign = match (self.sign, reciprocal.sign) {
+            (Sign::Positive, Sign::Positive) | (Sign::Negative, Sign::Negative) => Sign::Positive,
+            (Sign::Positive, Sign::Negative) | (Sign::Negative, Sign::Positive) => Sign::Negative,
+        };
+
+        Ok(Fraction {
+            numerator,
+            denominator,
+            sign,
+        }
+        .simplify())
     }
 }
 
